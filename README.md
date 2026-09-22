@@ -1,8 +1,8 @@
 # Prumo
 
-Prumo é um CLI que, futuramente, ajudará a criar e padronizar projetos de
-software. O projeto está em sua fase inicial e oferece apenas a fundação do CLI
-e a consulta de versão.
+Prumo é um CLI que ajuda a criar e padronizar projetos de software. Nesta fase,
+ele permite configurar interativamente um projeto, validar as escolhas e criar
+somente a estrutura inicial de diretórios planejada.
 
 ## Requisitos
 
@@ -16,16 +16,16 @@ Crie e ative um ambiente virtual:
 python -m venv .venv
 ```
 
+No PowerShell:
+
+```powershell
+.\.venv\Scripts\Activate.ps1
+```
+
 No Linux ou macOS:
 
 ```bash
 source .venv/bin/activate
-```
-
-No PowerShell:
-
-```powershell
-.venv\Scripts\Activate.ps1
 ```
 
 Instale as dependências e o Prumo em modo editável:
@@ -40,7 +40,12 @@ python -m pip install -e .
 ```bash
 prumo --help
 prumo version
+prumo create
 ```
+
+O comando `prumo create` solicita o nome e as tecnologias do projeto,
+apresenta um resumo para confirmação e cria os diretórios necessários. React,
+Angular, Flask e MySQL ainda não são instalados nem configurados nesta versão.
 
 ## Qualidade
 

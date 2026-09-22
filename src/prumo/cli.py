@@ -3,6 +3,7 @@
 import typer
 
 from prumo import __version__
+from prumo.commands.create import create
 
 app = typer.Typer(
     name="prumo",
@@ -20,3 +21,6 @@ def main() -> None:
 def version() -> None:
     """Exibe a versão atual do Prumo."""
     typer.echo(f"Prumo {__version__}")
+
+
+app.command()(create)
