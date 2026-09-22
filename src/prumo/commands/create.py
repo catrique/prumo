@@ -1,11 +1,10 @@
 """Interactive project creation command."""
 
-from enum import StrEnum
 from pathlib import Path
-from typing import TypeVar
 
 import typer
 
+from prumo.commands.prompts import PromptCancelled, prompt_project_config
 from prumo.generators.react import (
     ReactDependencyInstallError,
     ReactScaffoldError,
@@ -18,15 +17,11 @@ from prumo.node import (
     format_node_version,
 )
 from prumo.project.config import (
-    Backend,
-    Database,
-    Frontend,
     ProjectConfig,
-    ProjectConfigError,
-    validate_project_name,
+    ProjectType,
+    unavailable_generators,
 )
 from prumo.project.planner import (
-    ProjectKind,
     ProjectPlan,
     ProjectTargetExistsError,
     create_project_structure,
@@ -34,24 +29,24 @@ from prumo.project.planner import (
     plan_project,
 )
 
-Choice = TypeVar("Choice", bound=StrEnum)
-
 
 def create() -> None:
-    """Configure e crie a estrutura inicial de um projeto."""
-    config = _prompt_config()
+    """Configure e crie um projeto com o Prumo."""
+    try:
+        config = prompt_project_config()
+    except PromptCancelled:
+        typer.echo("Operação cancelada.")
+        return
+
     plan = plan_project(config)
-    _show_summary(config, plan)
+    _show_summary(config)
+    _stop_if_generator_is_unavailable(config)
 
     if not typer.confirm("Continuar?", default=True):
         typer.echo("Operação cancelada.")
         return
 
-    toolchain = (
-        _prepare_react_toolchain()
-        if config.frontend is Frontend.REACT
-        else None
-    )
+    toolchain = _prepare_react_toolchain()
 
     try:
         project_root = create_project_structure(plan)
@@ -59,12 +54,65 @@ def create() -> None:
         typer.echo(str(error), err=True)
         raise typer.Exit(code=1) from None
 
-    if toolchain is not None:
-        _generate_react(plan, project_root, toolchain)
-        _show_react_success(plan)
+    _generate_react(plan, project_root, toolchain)
+    _show_react_success(plan)
+
+
+def _show_summary(config: ProjectConfig) -> None:
+    fields: list[tuple[str, str]] = [
+        ("Nome", config.name),
+        ("Tipo", config.project_type.value),
+    ]
+
+    if config.project_type is ProjectType.FRONTEND:
+        fields.append(("Framework", str(config.frontend)))
+    elif config.project_type is ProjectType.API:
+        fields.extend(
+            (("Backend", str(config.api)), ("Banco", str(config.database)))
+        )
+    elif config.project_type is ProjectType.FULLSTACK:
+        fields.extend(
+            (
+                ("Frontend", str(config.frontend)),
+                ("Backend", str(config.api)),
+                ("Banco", str(config.database)),
+            )
+        )
+    else:
+        fields.extend(
+            (
+                ("Framework", str(config.web_framework)),
+                ("Banco", str(config.database)),
+            )
+        )
+
+    typer.echo("\nProjeto")
+    typer.echo("-" * 28)
+    for label, value in fields:
+        typer.echo(f"{label + ':':<12}{value}")
+    typer.echo()
+
+
+def _stop_if_generator_is_unavailable(config: ProjectConfig) -> None:
+    unavailable = unavailable_generators(config)
+    if not unavailable:
         return
 
-    typer.echo("Estrutura inicial criada.")
+    if len(unavailable) == 1:
+        message = (
+            f"o gerador {unavailable[0]} ainda não está disponível "
+            "nesta versão do Prumo."
+        )
+    else:
+        technologies = " e ".join(unavailable)
+        message = (
+            f"os geradores {technologies} ainda não estão disponíveis "
+            "nesta versão do Prumo."
+        )
+
+    typer.echo(f"A configuração foi reconhecida, mas {message}", err=True)
+    typer.echo("\nNenhum arquivo foi criado.", err=True)
+    raise typer.Exit(code=1)
 
 
 def _prepare_react_toolchain() -> NodeToolchain:
@@ -112,111 +160,11 @@ def _generate_react(
 
 
 def _show_react_success(plan: ProjectPlan) -> None:
-    frontend_path = _frontend_relative_path(plan)
     typer.echo("\nProjeto criado com sucesso.")
-
-    if plan.kind is ProjectKind.FULLSTACK:
-        typer.echo("\nFrontend:")
-        typer.echo("    frontend/")
-        typer.echo("\nBackend:")
-        typer.echo("    backend/")
-        typer.echo("\nPara iniciar o frontend:")
-        typer.echo(f"cd {frontend_path}")
-        typer.echo("npm run dev")
-        typer.echo("\nO backend Flask ainda não foi gerado.")
-        return
-
     typer.echo("\nPara iniciar:")
-    typer.echo(f"cd {frontend_path}")
+    typer.echo(f"cd {_frontend_relative_path(plan)}")
     typer.echo("npm run dev")
 
 
 def _frontend_relative_path(plan: ProjectPlan) -> Path:
     return frontend_target_directory(plan, Path(plan.root))
-
-
-def _prompt_config() -> ProjectConfig:
-    name = _prompt_project_name()
-    frontend = _prompt_choice(
-        "Frontend",
-        (Frontend.REACT, Frontend.ANGULAR, Frontend.NONE),
-    )
-    backend = _prompt_choice("Backend", (Backend.FLASK, Backend.NONE))
-
-    database_choices = (
-        (Database.MYSQL, Database.NONE)
-        if backend is Backend.FLASK
-        else (Database.NONE,)
-    )
-    database = _prompt_choice("Banco de dados", database_choices)
-
-    try:
-        return ProjectConfig(
-            name=name,
-            frontend=frontend,
-            backend=backend,
-            database=database,
-        )
-    except ProjectConfigError as error:
-        typer.echo(f"Configuração inválida: {error}", err=True)
-        raise typer.Exit(code=2) from None
-
-
-def _prompt_project_name() -> str:
-    while True:
-        name = typer.prompt("Nome do projeto")
-
-        try:
-            validate_project_name(name)
-        except ProjectConfigError as error:
-            typer.echo(f"Nome inválido: {error}", err=True)
-            continue
-
-        return name
-
-
-def _prompt_choice(label: str, choices: tuple[Choice, ...]) -> Choice:
-    available_values = "/".join(choice.value for choice in choices)
-
-    while True:
-        answer = typer.prompt(f"{label} [{available_values}]")
-
-        for choice in choices:
-            if answer.casefold() == choice.value.casefold():
-                return choice
-
-        typer.echo(
-            f"Opção inválida. Escolha uma destas opções: {available_values}.",
-            err=True,
-        )
-
-
-def _show_summary(config: ProjectConfig, plan: ProjectPlan) -> None:
-    typer.echo("\nProjeto")
-    typer.echo("-" * 28)
-    typer.echo(f"Nome:       {config.name}")
-    typer.echo(f"Frontend:   {config.frontend.value}")
-    typer.echo(f"Backend:    {config.backend.value}")
-    typer.echo(f"Banco:      {config.database.value}")
-    typer.echo(f"Estrutura:  {plan.kind.value}")
-    typer.echo("\nEstrutura planejada:\n")
-    typer.echo(_format_tree(plan))
-    typer.echo()
-
-
-def _format_tree(plan: ProjectPlan) -> str:
-    lines = [f"{plan.root}/"]
-
-    if plan.directories:
-        for index, directory in enumerate(plan.directories):
-            connector = "`--" if index == len(plan.directories) - 1 else "|--"
-            lines.append(f"{connector} {directory}/")
-    else:
-        content = (
-            "conteúdo do frontend na raiz"
-            if plan.kind is ProjectKind.FRONTEND
-            else "conteúdo do backend na raiz"
-        )
-        lines.append(f"`-- {content}")
-
-    return "\n".join(lines)

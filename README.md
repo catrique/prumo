@@ -1,9 +1,8 @@
 # Prumo
 
 Prumo é um CLI que ajuda a criar e padronizar projetos de software. Nesta fase,
-ele permite configurar interativamente um projeto, validar as escolhas e gerar
-aplicações React com Vite e TypeScript. As demais tecnologias ainda têm apenas
-sua estrutura inicial planejada.
+ele oferece menus interativos para configurar um projeto, validar as escolhas e
+gerar aplicações React com Vite e TypeScript.
 
 ## Requisitos
 
@@ -49,14 +48,18 @@ prumo version
 prumo create
 ```
 
-O comando `prumo create` solicita o nome e as tecnologias do projeto e
-apresenta um resumo para confirmação. Projetos React são gerados com Vite e
-TypeScript, e suas dependências npm são instaladas dentro do projeto.
+O comando `prumo create` usa menus navegáveis por setas e Enter, organizados
+por tipo:
 
-Em projetos somente React, o conteúdo fica diretamente na raiz. Em uma
-configuração React + Flask, o React fica em `frontend/` e `backend/` é
-reservado para a implementação futura do Flask. Angular, Flask e MySQL ainda
-não são gerados ou configurados.
+- Frontend: React ou Angular;
+- API: FastAPI ou Express, com MySQL opcional;
+- Fullstack: combinação de frontend e API, com MySQL opcional;
+- Aplicação web: Flask, com MySQL opcional.
+
+Atualmente, somente o gerador React está implementado. Ele usa Vite e
+TypeScript, instala as dependências npm dentro do projeto e mantém o conteúdo
+diretamente na raiz. Angular, FastAPI, Express, Flask e a configuração MySQL
+estão apenas planejados; ao selecioná-los, nenhum arquivo é criado.
 
 ## Qualidade
 

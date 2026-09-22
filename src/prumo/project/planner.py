@@ -1,21 +1,12 @@
 """Plan and create the initial project directory structure."""
 
 from dataclasses import dataclass
-from enum import StrEnum
 from pathlib import Path
 
-from prumo.project.config import Backend, Frontend, ProjectConfig, validate_project_name
+from prumo.project.config import ProjectConfig, ProjectType, validate_project_name
 
 _FRONTEND_DIRECTORY = "frontend"
 _BACKEND_DIRECTORY = "backend"
-
-
-class ProjectKind(StrEnum):
-    """Structural kinds supported by Prumo."""
-
-    FRONTEND = "Frontend"
-    BACKEND = "Backend"
-    FULLSTACK = "Fullstack"
 
 
 @dataclass(frozen=True, slots=True)
@@ -23,7 +14,7 @@ class ProjectPlan:
     """Directory structure calculated for a project."""
 
     root: str
-    kind: ProjectKind
+    project_type: ProjectType
     directories: tuple[str, ...]
 
 
@@ -33,20 +24,16 @@ class ProjectTargetExistsError(FileExistsError):
 
 def plan_project(config: ProjectConfig) -> ProjectPlan:
     """Calculate the project layout without touching the filesystem."""
-    has_frontend = config.frontend is not Frontend.NONE
-    has_backend = config.backend is not Backend.NONE
-
-    if has_frontend and has_backend:
-        kind = ProjectKind.FULLSTACK
-        directories = (_FRONTEND_DIRECTORY, _BACKEND_DIRECTORY)
-    elif has_frontend:
-        kind = ProjectKind.FRONTEND
-        directories = ()
-    else:
-        kind = ProjectKind.BACKEND
-        directories = ()
-
-    return ProjectPlan(root=config.name, kind=kind, directories=directories)
+    directories = (
+        (_FRONTEND_DIRECTORY, _BACKEND_DIRECTORY)
+        if config.project_type is ProjectType.FULLSTACK
+        else ()
+    )
+    return ProjectPlan(
+        root=config.name,
+        project_type=config.project_type,
+        directories=directories,
+    )
 
 
 def frontend_target_directory(plan: ProjectPlan, project_root: Path) -> Path:

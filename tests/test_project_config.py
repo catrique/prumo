@@ -1,65 +1,96 @@
 import pytest
 
 from prumo.project.config import (
-    Backend,
+    ApiFramework,
     Database,
     Frontend,
     ProjectConfig,
     ProjectConfigError,
+    ProjectType,
+    WebFramework,
     validate_project_name,
 )
 
 
 @pytest.mark.parametrize(
-    ("frontend", "backend", "database"),
+    "config",
     [
-        (Frontend.REACT, Backend.NONE, Database.NONE),
-        (Frontend.ANGULAR, Backend.NONE, Database.NONE),
-        (Frontend.NONE, Backend.FLASK, Database.NONE),
-        (Frontend.NONE, Backend.FLASK, Database.MYSQL),
-        (Frontend.REACT, Backend.FLASK, Database.NONE),
-        (Frontend.REACT, Backend.FLASK, Database.MYSQL),
-        (Frontend.ANGULAR, Backend.FLASK, Database.NONE),
-        (Frontend.ANGULAR, Backend.FLASK, Database.MYSQL),
+        ProjectConfig("portal", ProjectType.FRONTEND, frontend=Frontend.REACT),
+        ProjectConfig("portal", ProjectType.FRONTEND, frontend=Frontend.ANGULAR),
+        ProjectConfig(
+            "api",
+            ProjectType.API,
+            api=ApiFramework.FASTAPI,
+            database=Database.NONE,
+        ),
+        ProjectConfig(
+            "api",
+            ProjectType.API,
+            api=ApiFramework.EXPRESS,
+            database=Database.MYSQL,
+        ),
+        ProjectConfig(
+            "fullstack",
+            ProjectType.FULLSTACK,
+            frontend=Frontend.REACT,
+            api=ApiFramework.FASTAPI,
+            database=Database.NONE,
+        ),
+        ProjectConfig(
+            "fullstack",
+            ProjectType.FULLSTACK,
+            frontend=Frontend.ANGULAR,
+            api=ApiFramework.EXPRESS,
+            database=Database.MYSQL,
+        ),
+        ProjectConfig(
+            "painel",
+            ProjectType.WEB_APP,
+            web_framework=WebFramework.FLASK,
+            database=Database.MYSQL,
+        ),
     ],
 )
-def test_accepts_supported_configurations(
-    frontend: Frontend,
-    backend: Backend,
-    database: Database,
+def test_accepts_configurations_for_each_project_type(
+    config: ProjectConfig,
 ) -> None:
-    config = ProjectConfig(
-        name="sentinel",
-        frontend=frontend,
-        backend=backend,
-        database=database,
-    )
-
-    assert config.frontend is frontend
-    assert config.backend is backend
-    assert config.database is database
+    assert config.name
 
 
 @pytest.mark.parametrize(
-    ("frontend", "backend", "database"),
+    "arguments",
     [
-        (Frontend.NONE, Backend.NONE, Database.NONE),
-        (Frontend.REACT, Backend.NONE, Database.MYSQL),
-        (Frontend.ANGULAR, Backend.NONE, Database.MYSQL),
+        {
+            "name": "portal",
+            "project_type": ProjectType.FRONTEND,
+            "frontend": Frontend.REACT,
+            "database": Database.MYSQL,
+        },
+        {
+            "name": "api",
+            "project_type": ProjectType.API,
+            "api": ApiFramework.FASTAPI,
+        },
+        {
+            "name": "fullstack",
+            "project_type": ProjectType.FULLSTACK,
+            "frontend": Frontend.REACT,
+            "database": Database.NONE,
+        },
+        {
+            "name": "painel",
+            "project_type": ProjectType.WEB_APP,
+            "web_framework": WebFramework.FLASK,
+            "api": ApiFramework.FASTAPI,
+            "database": Database.NONE,
+        },
     ],
 )
-def test_rejects_unsupported_configurations(
-    frontend: Frontend,
-    backend: Backend,
-    database: Database,
+def test_rejects_fields_incompatible_with_project_type(
+    arguments: dict[str, object],
 ) -> None:
     with pytest.raises(ProjectConfigError):
-        ProjectConfig(
-            name="sentinel",
-            frontend=frontend,
-            backend=backend,
-            database=database,
-        )
+        ProjectConfig(**arguments)  # type: ignore[arg-type]
 
 
 @pytest.mark.parametrize("name", ["sentinel", "meu-projeto", "api_2026"])
