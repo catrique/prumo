@@ -6,6 +6,9 @@ from pathlib import Path
 
 from prumo.project.config import Backend, Frontend, ProjectConfig, validate_project_name
 
+_FRONTEND_DIRECTORY = "frontend"
+_BACKEND_DIRECTORY = "backend"
+
 
 class ProjectKind(StrEnum):
     """Structural kinds supported by Prumo."""
@@ -35,7 +38,7 @@ def plan_project(config: ProjectConfig) -> ProjectPlan:
 
     if has_frontend and has_backend:
         kind = ProjectKind.FULLSTACK
-        directories = ("frontend", "backend")
+        directories = (_FRONTEND_DIRECTORY, _BACKEND_DIRECTORY)
     elif has_frontend:
         kind = ProjectKind.FRONTEND
         directories = ()
@@ -44,6 +47,14 @@ def plan_project(config: ProjectConfig) -> ProjectPlan:
         directories = ()
 
     return ProjectPlan(root=config.name, kind=kind, directories=directories)
+
+
+def frontend_target_directory(plan: ProjectPlan, project_root: Path) -> Path:
+    """Resolve the directory where planned frontend content belongs."""
+    if _FRONTEND_DIRECTORY in plan.directories:
+        return project_root / _FRONTEND_DIRECTORY
+
+    return project_root
 
 
 def create_project_structure(

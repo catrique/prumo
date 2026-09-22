@@ -10,7 +10,12 @@ Este arquivo orienta agentes de código que trabalham no repositório Prumo.
 - Evite funções e arquivos excessivamente grandes.
 - Favoreça código legível, explícito e com nomes descritivos.
 - Evite dependências sem uma justificativa clara.
+- Detecte ferramentas do sistema; não tente instalá-las ou alterar o ambiente.
+- Execute subprocessos com argumentos separados e sem shell quando não houver
+  necessidade real.
+- Dependências do projeto podem ser instaladas dentro do próprio projeto.
 - Escreva ou atualize testes sempre que um comportamento for alterado.
+- Priorize testes de comportamentos críticos e evite testes de baixo valor.
 - Execute os testes e o lint antes de considerar uma tarefa concluída.
 - Verifique a segurança das alterações e nunca inclua secrets, credenciais ou
   dados específicos da máquina local.

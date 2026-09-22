@@ -1,10 +1,22 @@
 """Interactive project creation command."""
 
 from enum import StrEnum
+from pathlib import Path
 from typing import TypeVar
 
 import typer
 
+from prumo.generators.react import (
+    ReactDependencyInstallError,
+    ReactScaffoldError,
+    generate_react_project,
+)
+from prumo.node import (
+    NodePrerequisiteError,
+    NodeToolchain,
+    detect_node_toolchain,
+    format_node_version,
+)
 from prumo.project.config import (
     Backend,
     Database,
@@ -18,6 +30,7 @@ from prumo.project.planner import (
     ProjectPlan,
     ProjectTargetExistsError,
     create_project_structure,
+    frontend_target_directory,
     plan_project,
 )
 
@@ -34,13 +47,92 @@ def create() -> None:
         typer.echo("Operação cancelada.")
         return
 
+    toolchain = (
+        _prepare_react_toolchain()
+        if config.frontend is Frontend.REACT
+        else None
+    )
+
     try:
-        create_project_structure(plan)
+        project_root = create_project_structure(plan)
     except ProjectTargetExistsError as error:
         typer.echo(str(error), err=True)
         raise typer.Exit(code=1) from None
 
-    typer.echo("Projeto criado.")
+    if toolchain is not None:
+        _generate_react(plan, project_root, toolchain)
+        _show_react_success(plan)
+        return
+
+    typer.echo("Estrutura inicial criada.")
+
+
+def _prepare_react_toolchain() -> NodeToolchain:
+    try:
+        toolchain = detect_node_toolchain()
+    except NodePrerequisiteError as error:
+        typer.echo(str(error), err=True)
+        typer.echo("\nNenhum arquivo foi criado.", err=True)
+        raise typer.Exit(code=1) from None
+
+    typer.echo(
+        f"[OK] Node.js encontrado ({format_node_version(toolchain.node_version)})"
+    )
+    typer.echo("[OK] npm encontrado")
+    return toolchain
+
+
+def _generate_react(
+    plan: ProjectPlan,
+    project_root: Path,
+    toolchain: NodeToolchain,
+) -> None:
+    target_directory = frontend_target_directory(plan, project_root)
+
+    try:
+        generate_react_project(target_directory, toolchain.npm_executable)
+    except ReactScaffoldError as error:
+        typer.echo(str(error), err=True)
+        typer.echo(
+            "A estrutura inicial foi mantida e npm install não foi executado.",
+            err=True,
+        )
+        raise typer.Exit(code=1) from None
+    except ReactDependencyInstallError as error:
+        typer.echo(str(error), err=True)
+        typer.echo(
+            f"Execute npm install em '{_frontend_relative_path(plan)}' "
+            "para tentar novamente.",
+            err=True,
+        )
+        raise typer.Exit(code=1) from None
+
+    typer.echo("[OK] Projeto React criado")
+    typer.echo("[OK] Dependências instaladas")
+
+
+def _show_react_success(plan: ProjectPlan) -> None:
+    frontend_path = _frontend_relative_path(plan)
+    typer.echo("\nProjeto criado com sucesso.")
+
+    if plan.kind is ProjectKind.FULLSTACK:
+        typer.echo("\nFrontend:")
+        typer.echo("    frontend/")
+        typer.echo("\nBackend:")
+        typer.echo("    backend/")
+        typer.echo("\nPara iniciar o frontend:")
+        typer.echo(f"cd {frontend_path}")
+        typer.echo("npm run dev")
+        typer.echo("\nO backend Flask ainda não foi gerado.")
+        return
+
+    typer.echo("\nPara iniciar:")
+    typer.echo(f"cd {frontend_path}")
+    typer.echo("npm run dev")
+
+
+def _frontend_relative_path(plan: ProjectPlan) -> Path:
+    return frontend_target_directory(plan, Path(plan.root))
 
 
 def _prompt_config() -> ProjectConfig:
